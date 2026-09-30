@@ -1,0 +1,1440 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Reihenfolge — Urlaubsfotos sortieren</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1c1a17">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fotos sortieren">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<script src="vendor/exifr.lite.umd.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<style>
+@font-face{font-family:'Oswald';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/oswald-latin-400-normal.woff2) format('woff2');}
+@font-face{font-family:'Oswald';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/oswald-latin-500-normal.woff2) format('woff2');}
+@font-face{font-family:'Oswald';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/oswald-latin-600-normal.woff2) format('woff2');}
+@font-face{font-family:'Oswald';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/oswald-latin-700-normal.woff2) format('woff2');}
+@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/inter-latin-400-normal.woff2) format('woff2');}
+@font-face{font-family:'Inter';font-style:normal;font-weight:500;font-display:swap;src:url(fonts/inter-latin-500-normal.woff2) format('woff2');}
+@font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url(fonts/inter-latin-600-normal.woff2) format('woff2');}
+@font-face{font-family:'Inter';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/inter-latin-700-normal.woff2) format('woff2');}
+@font-face{font-family:'Space Mono';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/space-mono-latin-400-normal.woff2) format('woff2');}
+@font-face{font-family:'Space Mono';font-style:normal;font-weight:700;font-display:swap;src:url(fonts/space-mono-latin-700-normal.woff2) format('woff2');}
+:root{
+  --paper:#efe9dd;
+  --paper-dim:#e4ddcc;
+  --charcoal:#1c1a17;
+  --charcoal-2:#26231f;
+  --ink:#2a2622;
+  --ink-soft:#6b6255;
+  --amber:#d9a441;
+  --amber-deep:#b9822a;
+  --teal:#3c6e6b;
+  --red:#a8432f;
+  --line:#cfc5ae;
+  --white:#fbf9f4;
+  --radius:6px;
+  --shadow:0 2px 10px rgba(20,17,10,.18);
+  --shadow-lg:0 12px 34px rgba(15,12,6,.35);
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Inter',sans-serif;
+  overflow:hidden;
+}
+.sprockets{
+  height:14px;
+  background-image:radial-gradient(circle at 12px 7px, var(--paper) 4px, transparent 4.5px);
+  background-size:24px 14px;
+  background-repeat:repeat-x;
+}
+#app{
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  height:100dvh;
+}
+
+/* ===== TOP BAR ===== */
+header{
+  background:var(--charcoal);
+  color:var(--white);
+  padding:0;
+  flex-shrink:0;
+  box-shadow:var(--shadow);
+  z-index:20;
+}
+.header-row{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:12px 18px;
+  flex-wrap:wrap;
+}
+.brand{
+  font-family:'Oswald',sans-serif;
+  font-weight:600;
+  letter-spacing:.04em;
+  font-size:18px;
+  text-transform:uppercase;
+  color:var(--amber);
+  white-space:nowrap;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.brand small{
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  color:#8a8378;
+  text-transform:none;
+  letter-spacing:0;
+}
+.spacer{flex:1;}
+.btn{
+  font-family:'Inter',sans-serif;
+  font-weight:600;
+  font-size:13px;
+  border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);
+  color:var(--white);
+  padding:8px 14px;
+  border-radius:var(--radius);
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  transition:background .15s,border-color .15s,transform .1s;
+  white-space:nowrap;
+}
+.btn:hover{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.25);}
+.btn:active{transform:scale(.97);}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn.primary{background:var(--amber);color:#241d0f;border-color:var(--amber);}
+.btn.primary:hover{background:#e6b458;}
+.btn.ghost{background:transparent;}
+.btn.danger-outline{border-color:rgba(200,90,60,.4);color:#e8a08c;}
+.divider-v{width:1px;height:22px;background:rgba(255,255,255,.14);margin:0 2px;}
+.count-pill{
+  font-family:'Space Mono',monospace;
+  font-size:12px;
+  background:rgba(255,255,255,.08);
+  padding:5px 10px;
+  border-radius:20px;
+  color:#c9c2b4;
+}
+.icon{width:15px;height:15px;flex-shrink:0;}
+
+/* ===== MAIN LAYOUT ===== */
+main{
+  flex:1;
+  display:flex;
+  min-height:0;
+  min-width:0;
+}
+#dropzone-overlay{
+  position:fixed;inset:0;
+  background:rgba(28,26,23,.88);
+  z-index:100;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  color:var(--amber);
+  font-family:'Oswald',sans-serif;
+  font-size:26px;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  border:4px dashed var(--amber);
+  margin:14px;
+  pointer-events:none;
+}
+#dropzone-overlay.active{display:flex;}
+
+/* ---- Empty state ---- */
+#empty-state{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:22px;
+  text-align:center;
+  padding:40px;
+}
+#empty-state .film-icon{
+  width:120px;height:80px;
+  background:var(--charcoal);
+  border-radius:4px;
+  position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+#empty-state .film-icon:before,#empty-state .film-icon:after{
+  content:'';
+  position:absolute;left:0;right:0;height:10px;
+  background-image:radial-gradient(circle at 10px 5px, var(--paper) 2.5px, transparent 3px);
+  background-size:20px 10px;
+}
+#empty-state .film-icon:before{top:6px;}
+#empty-state .film-icon:after{bottom:6px;}
+#empty-state h1{
+  font-family:'Oswald',sans-serif;
+  font-size:26px;
+  font-weight:600;
+  margin:0;
+  color:var(--ink);
+}
+#empty-state p{
+  color:var(--ink-soft);
+  max-width:440px;
+  line-height:1.5;
+  margin:0;
+  font-size:14.5px;
+}
+.import-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.btn-solid{
+  font-family:'Inter',sans-serif;
+  font-weight:600;font-size:14px;
+  background:var(--charcoal);color:var(--white);
+  padding:12px 20px;border-radius:var(--radius);
+  border:none;cursor:pointer;
+}
+.btn-solid:hover{background:var(--charcoal-2);}
+.btn-outline{
+  font-family:'Inter',sans-serif;font-weight:600;font-size:14px;
+  background:transparent;color:var(--ink);
+  padding:12px 20px;border-radius:var(--radius);
+  border:1.5px solid var(--line);cursor:pointer;
+}
+.btn-outline:hover{border-color:var(--ink-soft);}
+
+/* ---- Preview panel ---- */
+#preview-panel{
+  width:44%;
+  max-width:640px;
+  min-width:340px;
+  background:var(--charcoal);
+  display:flex;
+  flex-direction:column;
+  flex-shrink:0;
+  border-right:1px solid #000;
+}
+#preview-stage{
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  overflow:hidden;
+  min-height:0;
+  min-width:0;
+  padding:18px;
+}
+#preview-panel{
+  min-height:0;
+}
+#preview-img{
+  max-width:100%;max-height:100%;
+  object-fit:contain;
+  border-radius:2px;
+  box-shadow:var(--shadow-lg);
+  background:#000;
+}
+#preview-placeholder{
+  color:#6b6459;
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+  text-align:center;
+}
+.preview-nav-btn{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(0,0,0,.45);
+  border:1px solid rgba(255,255,255,.15);
+  color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+  font-size:18px;
+  transition:background .15s;
+}
+.preview-nav-btn:hover{background:rgba(0,0,0,.7);}
+.preview-nav-btn.prev{left:14px;}
+.preview-nav-btn.next{right:14px;}
+#preview-frame-badge{
+  position:absolute;
+  top:16px;left:16px;
+  font-family:'Space Mono',monospace;
+  background:rgba(0,0,0,.55);
+  color:var(--amber);
+  padding:5px 10px;
+  border-radius:4px;
+  font-size:12px;
+  letter-spacing:.03em;
+}
+#preview-meta{
+  flex-shrink:0;
+  padding:14px 18px 18px;
+  border-top:1px solid rgba(255,255,255,.08);
+  color:#cfc9bc;
+}
+#preview-meta .fname{
+  font-family:'Space Mono',monospace;
+  font-size:12.5px;
+  color:var(--white);
+  word-break:break-all;
+  margin-bottom:8px;
+}
+.meta-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+.chip{
+  font-size:11px;
+  padding:3px 8px;
+  border-radius:20px;
+  background:rgba(255,255,255,.08);
+  color:#b8b1a3;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.chip.date{color:#a9d1c9;}
+.chip.warn{color:#e8a08c;background:rgba(168,67,47,.18);}
+.position-set{display:flex;align-items:center;gap:8px;}
+.position-set label{font-size:12px;color:#a29a8c;}
+.position-set input{
+  width:64px;
+  background:#141210;
+  border:1px solid #423b32;
+  color:var(--white);
+  border-radius:4px;
+  padding:6px 8px;
+  font-family:'Space Mono',monospace;
+  font-size:13px;
+}
+.position-set button{
+  background:var(--amber);color:#241d0f;border:none;
+  padding:7px 12px;border-radius:4px;font-weight:600;font-size:12px;cursor:pointer;
+}
+
+/* ---- Grid panel ---- */
+#grid-panel{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  min-height:0;
+  background:var(--paper);
+}
+#grid-toolbar{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 16px;
+  border-bottom:1px solid var(--line);
+  background:var(--paper-dim);
+  flex-wrap:wrap;
+  flex-shrink:0;
+}
+.mode-toggle{
+  display:flex;
+  background:#e0d8c2;
+  border-radius:20px;
+  padding:3px;
+  gap:2px;
+}
+.mode-toggle button{
+  border:none;background:transparent;
+  padding:6px 13px;border-radius:16px;
+  font-size:12.5px;font-weight:600;font-family:'Inter',sans-serif;
+  cursor:pointer;color:var(--ink-soft);
+  transition:background .15s,color .15s;
+}
+.mode-toggle button.active{background:var(--charcoal);color:var(--amber);}
+.tool-btn{
+  font-size:12.5px;font-weight:600;
+  color:var(--ink);
+  background:var(--white);
+  border:1px solid var(--line);
+  padding:7px 12px;
+  border-radius:var(--radius);
+  cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.tool-btn:hover{border-color:var(--ink-soft);}
+.tool-btn:disabled{opacity:.4;cursor:not-allowed;}
+#grid-scroll{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:16px;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+}
+#grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(var(--thumb-size,128px),1fr));
+  gap:12px;
+  align-content:start;
+}
+.zoom-control{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  background:var(--white);
+  border:1px solid var(--line);
+  border-radius:20px;
+  padding:5px 8px;
+}
+.zoom-btn{
+  width:22px;height:22px;
+  border-radius:50%;
+  border:1px solid var(--line);
+  background:var(--paper);
+  color:var(--ink);
+  font-size:15px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.zoom-btn:hover{border-color:var(--ink-soft);}
+#zoom-slider{
+  width:90px;
+  accent-color:var(--amber-deep);
+  cursor:pointer;
+}
+.thumb.drag-armed{
+  border-color:var(--amber) !important;
+  transform:scale(1.04);
+  box-shadow:var(--shadow-lg);
+  z-index:5;
+  transition:transform .12s;
+}
+.thumb{
+  position:relative;
+  aspect-ratio:1/1;
+  border-radius:5px;
+  overflow:hidden;
+  background:#dcd3ba;
+  cursor:pointer;
+  border:2px solid transparent;
+  content-visibility:auto;
+  contain-intrinsic-size:150px 150px;
+  touch-action:pan-y;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-touch-callout:none;
+}
+.thumb.drag-mode{
+  /* Native touch scrolling must be off from the very first touch, not
+     toggled later — browsers decide pan-vs-JS at touchstart and won't
+     honor a later change. We do our own scrolling instead (see JS). */
+  touch-action:none;
+}
+.thumb.active-preview{border-color:var(--amber);}
+.thumb.dragging{opacity:.35;}
+.thumb.drag-ghost{
+  position:fixed;
+  pointer-events:none;
+  z-index:200;
+  width:110px;height:110px;
+  border-radius:6px;
+  overflow:hidden;
+  box-shadow:var(--shadow-lg);
+  border:2px solid var(--amber);
+  opacity:.92;
+}
+.thumb.drag-ghost img{width:100%;height:100%;object-fit:cover;}
+.thumb img{
+  width:100%;height:100%;object-fit:cover;
+  display:block;
+  background:#dcd3ba;
+  pointer-events:none;
+  -webkit-user-drag:none;
+  -webkit-touch-callout:none;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.thumb .badge{
+  position:absolute;top:5px;left:5px;
+  background:rgba(20,17,10,.72);
+  color:var(--amber);
+  font-family:'Space Mono',monospace;
+  font-size:11px;
+  font-weight:700;
+  padding:2px 6px;
+  border-radius:3px;
+  letter-spacing:.02em;
+}
+.thumb.unassigned .badge{
+  color:#cfc7b6;background:rgba(20,17,10,.5);
+}
+.thumb .device-chip{
+  position:absolute;bottom:5px;left:5px;right:5px;
+  font-size:9.5px;
+  color:#fff;
+  background:rgba(20,17,10,.55);
+  padding:2px 5px;
+  border-radius:3px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.thumb .drag-handle{
+  position:absolute;top:4px;right:4px;
+  width:20px;height:20px;
+  background:rgba(20,17,10,.5);
+  border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  color:#e8e2d2;
+  cursor:grab;
+  font-size:13px;
+  line-height:1;
+}
+.thumb .no-date-flag{
+  position:absolute;top:5px;right:5px;
+  width:8px;height:8px;border-radius:50%;
+  background:var(--red);
+  box-shadow:0 0 0 2px rgba(20,17,10,.6);
+}
+.thumb.drag-mode .drag-handle{display:flex;}
+.thumb:not(.drag-mode) .drag-handle{display:none;}
+.thumb .placeholder-spin{
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  color:#a89f88;
+  font-size:10px;
+  font-family:'Space Mono',monospace;
+}
+.drop-indicator{
+  height:3px;background:var(--amber);border-radius:3px;
+  margin:-6px 0;
+}
+
+/* toast / progress */
+#toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--charcoal);color:var(--white);
+  padding:11px 20px;border-radius:8px;
+  font-size:13px;
+  box-shadow:var(--shadow-lg);
+  z-index:300;
+  display:none;
+  align-items:center;
+  gap:12px;
+}
+#toast.show{display:flex;}
+#toast .bar-track{
+  width:120px;height:4px;background:#3a352c;border-radius:3px;overflow:hidden;
+}
+#toast .bar-fill{height:100%;background:var(--amber);width:0%;transition:width .15s;}
+
+/* modal */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(20,17,10,.55);
+  z-index:250;display:none;align-items:center;justify-content:center;
+}
+.modal-backdrop.show{display:flex;}
+.modal{
+  background:var(--white);
+  border-radius:10px;
+  padding:24px;
+  width:380px;
+  max-width:90vw;
+  box-shadow:var(--shadow-lg);
+}
+.modal h3{margin:0 0 6px;font-family:'Oswald',sans-serif;font-size:18px;}
+.modal p{margin:0 0 16px;font-size:13px;color:var(--ink-soft);line-height:1.5;}
+.modal-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;font-size:13.5px;}
+.modal-row select,.modal-row input{
+  font-family:'Space Mono',monospace;font-size:13px;
+  padding:6px 8px;border:1px solid var(--line);border-radius:4px;
+}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px;}
+
+/* hidden native inputs */
+input[type=file]{display:none;}
+
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:#c4b99c;border-radius:6px;}
+
+@media (max-width:860px){
+  #preview-panel{
+    width:100%;max-width:none;min-width:0;
+    position:fixed;inset:0;z-index:60;
+    display:none;
+  }
+  #preview-panel.mobile-open{display:flex;}
+  #preview-close-mobile{display:flex !important;}
+  main{flex-direction:column;}
+  .header-row{padding:10px 12px;}
+  .brand small{display:none;}
+}
+#preview-close-mobile{
+  display:none;
+  position:absolute;top:14px;right:14px;
+  width:34px;height:34px;border-radius:50%;
+  background:rgba(0,0,0,.5);color:#fff;border:none;
+  align-items:center;justify-content:center;font-size:18px;cursor:pointer;
+  z-index:5;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="header-row">
+      <div class="brand">🎞 Reihenfolge <small>Urlaubsfotos&nbsp;sortieren&nbsp;·&nbsp;lokal&nbsp;im&nbsp;Browser</small></div>
+      <div class="spacer"></div>
+      <span id="photo-count" class="count-pill" style="display:none;">0 Bilder</span>
+      <div class="divider-v" id="hdr-div-1" style="display:none;"></div>
+      <button class="btn ghost" id="btn-add-more" style="display:none;">＋ Weitere Bilder</button>
+      <button class="btn ghost" id="btn-autosort" style="display:none;">🕒 Automatisch sortieren</button>
+      <button class="btn ghost" id="btn-undo" style="display:none;" disabled>↶ Rückgängig</button>
+      <button class="btn ghost" id="btn-redo" style="display:none;" disabled>↷ Wiederholen</button>
+      <div class="divider-v" id="hdr-div-2" style="display:none;"></div>
+      <button class="btn primary" id="btn-export" style="display:none;">⬇ Exportieren</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="empty-state">
+      <div class="film-icon"></div>
+      <h1>Bringt eure Urlaubsfotos in die richtige Reihenfolge</h1>
+      <p>Ladet Fotos von allen Geräten – Handys, Kamera – in einen gemeinsamen Stapel. Ihr seht jedes Bild groß, während gleichzeitig alle anderen als Kontaktbogen sichtbar bleiben, und bestimmt die Reihenfolge per Drag&nbsp;&amp;&nbsp;Drop oder durch Anklicken. Die Originaldateien bleiben unverändert.</p>
+      <div class="import-actions">
+        <button class="btn-solid" id="btn-pick-files">Bilder auswählen</button>
+        <button class="btn-outline" id="btn-pick-folder">Ordner auswählen</button>
+      </div>
+      <p style="font-size:12px;color:#9c9382;">…oder Dateien/Ordner einfach hierher ziehen</p>
+    </div>
+
+    <div id="preview-panel">
+      <button id="preview-close-mobile">✕</button>
+      <div id="preview-stage">
+        <div id="preview-placeholder">Kein Bild ausgewählt</div>
+        <img id="preview-img" style="display:none;">
+        <div id="preview-frame-badge" style="display:none;"></div>
+        <button class="preview-nav-btn prev" id="preview-prev" style="display:none;">‹</button>
+        <button class="preview-nav-btn next" id="preview-next" style="display:none;">›</button>
+      </div>
+      <div id="preview-meta" style="display:none;">
+        <div class="fname" id="preview-fname"></div>
+        <div class="meta-chips" id="preview-chips"></div>
+        <div class="position-set">
+          <label>Position setzen:</label>
+          <input type="number" id="preview-pos-input" min="1">
+          <button id="preview-pos-apply">Setzen</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="grid-panel" style="display:none;">
+      <div id="grid-toolbar">
+        <div class="mode-toggle">
+          <button id="mode-drag" class="active">Drag&nbsp;&amp;&nbsp;Drop</button>
+          <button id="mode-click">Durchnummerieren</button>
+        </div>
+        <button class="tool-btn" id="btn-reset-numbering" style="display:none;">↺ Nummerierung zurücksetzen</button>
+        <div class="spacer"></div>
+        <div class="zoom-control">
+          <button class="zoom-btn" id="zoom-out" aria-label="Kleiner">−</button>
+          <input type="range" id="zoom-slider" min="90" max="260" value="128" step="2">
+          <button class="zoom-btn" id="zoom-in" aria-label="Größer">+</button>
+        </div>
+        <span style="font-size:11.5px;color:var(--ink-soft);" id="grid-hint">Bilder ziehen, um die Reihenfolge zu ändern. Klick öffnet die Großvorschau.</span>
+      </div>
+      <div id="grid-scroll">
+        <div id="grid"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="dropzone-overlay">Bilder hier ablegen</div>
+
+<input type="file" id="file-input" multiple accept="image/*">
+<input type="file" id="folder-input" webkitdirectory multiple>
+
+<div id="toast">
+  <span id="toast-text">Arbeite…</span>
+  <div class="bar-track"><div class="bar-fill" id="toast-bar"></div></div>
+</div>
+
+<div class="modal-backdrop" id="export-modal">
+  <div class="modal">
+    <h3>Fotos exportieren</h3>
+    <p>Die Bilder werden mit fortlaufender Nummer als Präfix in ein ZIP-Archiv gepackt. Eure Originaldateien werden dabei nicht verändert.</p>
+    <div class="modal-row">
+      <span>Format des Präfix</span>
+      <select id="export-prefix-style">
+        <option value="3">001_</option>
+        <option value="4">0001_</option>
+      </select>
+    </div>
+    <div class="modal-row">
+      <span>Nur ab aktuellem Bild bis Ende</span>
+      <input type="checkbox" id="export-scope-checkbox">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" id="export-cancel">Abbrechen</button>
+      <button class="btn-solid" id="export-confirm">ZIP erstellen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================= STATE ============================= */
+const state = {
+  photos: new Map(),      // id -> {id, file, name, size, lastModified, exifDate, dateSource, camera, thumbUrl, thumbLoading}
+  sequence: [],           // array of ids, source of truth for order
+  currentPreviewId: null,
+  mode: 'drag',           // 'drag' | 'click'
+  clickCounter: 0,        // how many photos have been placed via click mode
+  undoStack: [],
+  redoStack: [],
+  nextId: 1,
+};
+
+const el = (id)=>document.getElementById(id);
+const grid = el('grid');
+const gridScroll = el('grid-scroll');
+
+/* ============================= UTIL ============================= */
+function uid(){ return 'p'+(state.nextId++); }
+
+function pad(num, len){
+  return String(num).padStart(len,'0');
+}
+
+function extOf(name){
+  const m = /\.[^.]+$/.exec(name);
+  return m ? m[0] : '';
+}
+
+function baseOf(name){
+  return name.replace(/\.[^.]+$/, '');
+}
+
+function fmtDate(d){
+  if(!d) return null;
+  try{
+    return d.toLocaleString('de-DE', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  }catch(e){ return null; }
+}
+
+function toast(text, withProgress){
+  el('toast-text').textContent = text;
+  el('toast').classList.add('show');
+  el('toast-bar').parentElement.style.display = withProgress ? '' : 'none';
+  if(!withProgress){
+    clearTimeout(toast._t);
+    toast._t = setTimeout(()=>el('toast').classList.remove('show'), 2200);
+  }
+}
+function toastProgress(pct){
+  el('toast-bar').style.width = Math.max(0,Math.min(100,pct))+'%';
+}
+function toastHide(){
+  el('toast').classList.remove('show');
+}
+
+/* ============================= IMPORT ============================= */
+async function handleFilesImport(fileList){
+  const files = Array.from(fileList).filter(f=>/^image\//.test(f.type) || /\.(jpe?g|png|heic|webp|tiff?)$/i.test(f.name));
+  if(files.length===0){ toast('Keine unterstützten Bilddateien gefunden.'); return; }
+
+  el('empty-state').style.display = 'none';
+  el('grid-panel').style.display = 'flex';
+  ['photo-count','hdr-div-1','btn-add-more','btn-autosort','btn-undo','btn-redo','hdr-div-2','btn-export'].forEach(id=>el(id).style.display='');
+
+  toast('Lese '+files.length+' Bild(er) ein…', true);
+  const newIds = [];
+  let done = 0;
+
+  for(const file of files){
+    const id = uid();
+    const photo = {
+      id, file,
+      name: file.name,
+      size: file.size,
+      lastModified: file.lastModified,
+      exifDate: null,
+      dateSource: 'dateiänderung',
+      camera: null,
+      thumbUrl: null,
+    };
+    state.photos.set(id, photo);
+    newIds.push(id);
+
+    try{
+      if(window.exifr){
+        const data = await exifr.parse(file, {pick:['DateTimeOriginal','CreateDate','Make','Model']}).catch(()=>null);
+        if(data){
+          const dt = data.DateTimeOriginal || data.CreateDate;
+          if(dt instanceof Date && !isNaN(dt)){
+            photo.exifDate = dt;
+            photo.dateSource = 'exif';
+          }
+          if(data.Make || data.Model){
+            photo.camera = [data.Make, data.Model].filter(Boolean).join(' ').trim();
+          }
+        }
+      }
+    }catch(e){ /* ignore exif failures per file */ }
+
+    done++;
+    if(done % 8 === 0) toastProgress(done/files.length*100);
+  }
+  toastProgress(100);
+  setTimeout(toastHide, 350);
+
+  // append new photos sorted by best-known date at the end, keep existing order intact
+  newIds.sort((a,b)=>getSortDate(state.photos.get(a)) - getSortDate(state.photos.get(b)));
+  state.sequence = state.sequence.concat(newIds);
+
+  pushHistory();
+  renderGrid();
+  refreshCount();
+  if(!state.currentPreviewId && state.sequence.length){
+    setPreview(state.sequence[0]);
+  }
+}
+
+function getSortDate(photo){
+  if(photo.exifDate) return photo.exifDate.getTime();
+  return photo.lastModified;
+}
+
+/* ============================= HISTORY ============================= */
+function pushHistory(){
+  state.undoStack.push(state.sequence.slice());
+  if(state.undoStack.length>60) state.undoStack.shift();
+  state.redoStack.length = 0;
+  updateHistoryButtons();
+}
+function undo(){
+  if(state.undoStack.length<2) return;
+  state.redoStack.push(state.undoStack.pop());
+  state.sequence = state.undoStack[state.undoStack.length-1].slice();
+  renderGrid();
+  updateHistoryButtons();
+}
+function redo(){
+  if(state.redoStack.length===0) return;
+  const seq = state.redoStack.pop();
+  state.undoStack.push(seq.slice());
+  state.sequence = seq.slice();
+  renderGrid();
+  updateHistoryButtons();
+}
+function updateHistoryButtons(){
+  el('btn-undo').disabled = state.undoStack.length<2;
+  el('btn-redo').disabled = state.redoStack.length===0;
+}
+
+/* ============================= AUTO SORT ============================= */
+function autoSortByDate(){
+  const seq = state.sequence.slice().sort((a,b)=>getSortDate(state.photos.get(a)) - getSortDate(state.photos.get(b)));
+  state.sequence = seq;
+  pushHistory();
+  renderGrid();
+  toast('Chronologisch nach Aufnahmedatum sortiert (EXIF, sonst Dateidatum).');
+}
+
+/* ============================= THUMBNAILS ============================= */
+const thumbObserver = new IntersectionObserver((entries)=>{
+  for(const entry of entries){
+    if(entry.isIntersecting){
+      const id = entry.target.dataset.id;
+      loadThumb(id, entry.target);
+      thumbObserver.unobserve(entry.target);
+    }
+  }
+}, {root: gridScroll, rootMargin:'400px 0px', threshold:0.01});
+
+async function loadThumb(id, cellEl){
+  const photo = state.photos.get(id);
+  if(!photo || photo.thumbUrl){
+    if(photo && photo.thumbUrl) applyThumbToCell(cellEl, photo.thumbUrl);
+    return;
+  }
+  try{
+    const bitmap = await createImageBitmap(photo.file, {imageOrientation:'from-image'});
+    const size = 320;
+    const scale = Math.max(size/bitmap.width, size/bitmap.height);
+    const w = Math.round(bitmap.width*scale), h = Math.round(bitmap.height*scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, (size-w)/2, (size-h)/2, w, h);
+    bitmap.close && bitmap.close();
+    const blob = await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.78));
+    const url = URL.createObjectURL(blob);
+    photo.thumbUrl = url;
+    applyThumbToCell(cellEl, url);
+  }catch(e){
+    if(cellEl){
+      const ph = cellEl.querySelector('.placeholder-spin');
+      if(ph) ph.textContent = '⚠';
+    }
+  }
+}
+function applyThumbToCell(cellEl, url){
+  if(!cellEl) return;
+  const img = cellEl.querySelector('img');
+  const ph = cellEl.querySelector('.placeholder-spin');
+  if(img){ img.src = url; img.style.display='block'; }
+  if(ph) ph.remove();
+}
+
+/* ============================= GRID RENDER ============================= */
+function renderGrid(){
+  grid.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  state.sequence.forEach((id, idx)=>{
+    frag.appendChild(buildCell(id, idx));
+  });
+  grid.appendChild(frag);
+  refreshCount();
+}
+
+function buildCell(id, idx){
+  const photo = state.photos.get(id);
+  const cell = document.createElement('div');
+  cell.className = 'thumb' + (state.mode==='drag' ? ' drag-mode':'') + (id===state.currentPreviewId?' active-preview':'');
+  cell.dataset.id = id;
+
+  const img = document.createElement('img');
+  img.draggable = false;
+  img.style.display = photo.thumbUrl ? 'block':'none';
+  if(photo.thumbUrl) img.src = photo.thumbUrl;
+  cell.appendChild(img);
+
+  if(!photo.thumbUrl){
+    const ph = document.createElement('div');
+    ph.className='placeholder-spin';
+    ph.textContent='…';
+    cell.appendChild(ph);
+  }
+
+  const badge = document.createElement('div');
+  badge.className='badge';
+  badge.textContent = 'Nr. ' + pad(idx+1, String(state.sequence.length).length<3?3:String(state.sequence.length).length);
+  cell.appendChild(badge);
+
+  if(state.mode==='click' && idx>=state.clickCounter){
+    cell.classList.add('unassigned');
+  }
+
+  if(photo.camera){
+    const chip = document.createElement('div');
+    chip.className='device-chip';
+    chip.textContent = photo.camera;
+    cell.appendChild(chip);
+  }
+
+  if(photo.dateSource!=='exif'){
+    const flag = document.createElement('div');
+    flag.className='no-date-flag';
+    flag.title='Kein EXIF-Aufnahmedatum gefunden — sortiert nach Dateidatum';
+    cell.appendChild(flag);
+  }
+
+  const handle = document.createElement('div');
+  handle.className='drag-handle';
+  handle.textContent='⠿';
+  cell.appendChild(handle);
+
+  cell.addEventListener('contextmenu', (e)=>e.preventDefault());
+
+  cell.addEventListener('click', (e)=>{
+    if(cell._wasDragged){ cell._wasDragged=false; return; }
+    if(state.mode==='click'){
+      handleClickNumbering(id);
+    }else{
+      setPreview(id);
+      if(window.innerWidth<=860) openMobilePreview();
+    }
+  });
+
+  if(state.mode==='drag'){
+    attachDragHandlers(cell);
+  }
+
+  thumbObserver.observe(cell);
+  return cell;
+}
+
+function refreshCount(){
+  el('photo-count').textContent = state.sequence.length + (state.sequence.length===1?' Bild':' Bilder');
+}
+
+/* ============================= CLICK-NUMBERING MODE ============================= */
+function handleClickNumbering(id){
+  const curIdx = state.sequence.indexOf(id);
+  if(curIdx < state.clickCounter){
+    // already numbered -> un-number it (move to just after the numbered block, decrement)
+    state.sequence.splice(curIdx,1);
+    state.sequence.splice(state.clickCounter-1,0,id);
+    state.clickCounter--;
+  }else{
+    state.sequence.splice(curIdx,1);
+    state.sequence.splice(state.clickCounter,0,id);
+    state.clickCounter++;
+  }
+  pushHistory();
+  renderGrid();
+}
+
+function resetNumbering(){
+  state.clickCounter = 0;
+  pushHistory();
+  renderGrid();
+  toast('Nummerierung zurückgesetzt — klickt die Fotos in der gewünschten Reihenfolge an.');
+}
+
+/* ============================= DRAG & DROP REORDER (pointer-based) ============================= */
+let dragCtx = null;
+const LONG_PRESS_MS = 300;
+const MOVE_CANCEL_PX = 9;   // finger drift allowed while waiting for long-press
+const DRAG_START_PX = 4;    // movement needed to actually start reordering once armed
+
+function attachDragHandlers(cell){
+  const handle = cell.querySelector('.drag-handle');
+
+  // Plain touch/mouse on the cell itself: scrolling must win by default.
+  // Touch needs a deliberate long-press before it's treated as a drag.
+  // Mouse can start immediately on small movement (no scroll conflict there).
+  cell.addEventListener('pointerdown', (e)=>{
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    beginPointerSequence(e, cell, {requireHold: e.pointerType==='touch'});
+  });
+
+  // The ⠿ handle is an explicit "grab here" affordance: starts a drag
+  // immediately, no long-press needed, and stops the tap from also
+  // being read as a scroll gesture.
+  handle.addEventListener('pointerdown', (e)=>{
+    e.stopPropagation();
+    e.preventDefault();
+    beginPointerSequence(e, cell, {requireHold:false});
+  });
+}
+
+function beginPointerSequence(e, cell, opts){
+  const startX=e.clientX, startY=e.clientY;
+  const pointerId = e.pointerId;
+  let armed = !opts.requireHold;
+  let started = false;
+  let holdTimer = null;
+  let ghost = null;
+
+  if(opts.requireHold){
+    holdTimer = setTimeout(()=>{
+      armed = true;
+      cell.classList.add('drag-armed');
+      cell.style.touchAction='none';
+      try{ cell.setPointerCapture(pointerId); }catch(err){}
+      if(navigator.vibrate) navigator.vibrate(12);
+    }, LONG_PRESS_MS);
+  } else {
+    cell.classList.add('drag-armed');
+    cell.style.touchAction='none';
+    try{ cell.setPointerCapture(pointerId); }catch(err){}
+  }
+
+  let lastY = e.clientY;
+
+  function teardownListeners(){
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onUp);
+  }
+
+  function onMove(ev){
+    if(ev.pointerId!==pointerId) return;
+    const dx=ev.clientX-startX, dy=ev.clientY-startY;
+
+    if(!armed){
+      // Still waiting for the long-press to complete. Because drag-mode
+      // thumbnails have touch-action:none (required so a later "arm" is
+      // actually honored), the browser will NOT scroll them for us — so
+      // as long as we're just waiting, we scroll the list ourselves.
+      gridScroll.scrollTop -= (ev.clientY-lastY);
+      lastY = ev.clientY;
+      if(Math.abs(dx)>MOVE_CANCEL_PX || Math.abs(dy)>MOVE_CANCEL_PX){
+        clearTimeout(holdTimer);
+      }
+      ev.preventDefault();
+      return;
+    }
+
+    if(!started){
+      if(Math.abs(dx)<DRAG_START_PX && Math.abs(dy)<DRAG_START_PX) return;
+      started=true;
+      cell._wasDragged=true;
+      cell.classList.remove('drag-armed');
+      cell.classList.add('dragging');
+      cell.style.touchAction='none';
+      try{ cell.setPointerCapture(pointerId); }catch(err){}
+      ghost=document.createElement('div');
+      ghost.className='thumb drag-ghost';
+      const img=cell.querySelector('img');
+      if(img && img.src){ const gi=document.createElement('img'); gi.src=img.src; ghost.appendChild(gi); }
+      document.body.appendChild(ghost);
+      dragCtx = {id: cell.dataset.id, cell};
+    }
+
+    ev.preventDefault();
+    if(ghost){
+      ghost.style.left=(ev.clientX-55)+'px';
+      ghost.style.top=(ev.clientY-55)+'px';
+    }
+    autoScrollIfNearEdge(ev.clientY);
+    const target = document.elementFromPoint(ev.clientX, ev.clientY);
+    const targetCell = target ? target.closest('.thumb') : null;
+    if(targetCell && targetCell!==cell && grid.contains(targetCell)){
+      const rect = targetCell.getBoundingClientRect();
+      const before = ev.clientX < rect.left+rect.width/2;
+      if(before){
+        grid.insertBefore(cell, targetCell);
+      }else{
+        grid.insertBefore(cell, targetCell.nextSibling);
+      }
+    }
+  }
+
+  function onUp(ev){
+    clearTimeout(holdTimer);
+    teardownListeners();
+    cell.classList.remove('drag-armed');
+    cell.style.touchAction='';
+    if(ghost) ghost.remove();
+    cell.classList.remove('dragging');
+    try{ cell.releasePointerCapture(pointerId); }catch(err){}
+    if(started){
+      const newSeq = Array.from(grid.children).map(c=>c.dataset.id);
+      state.sequence = newSeq;
+      dragCtx=null;
+      pushHistory();
+      renderGrid();
+    }
+  }
+
+  window.addEventListener('pointermove', onMove, {passive:false});
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
+}
+
+function autoScrollIfNearEdge(clientY){
+  const rect = gridScroll.getBoundingClientRect();
+  const threshold = 60;
+  if(clientY - rect.top < threshold){
+    gridScroll.scrollTop -= 14;
+  }else if(rect.bottom - clientY < threshold){
+    gridScroll.scrollTop += 14;
+  }
+}
+
+/* ============================= PREVIEW PANEL ============================= */
+async function setPreview(id){
+  state.currentPreviewId = id;
+  document.querySelectorAll('.thumb.active-preview').forEach(c=>c.classList.remove('active-preview'));
+  const cell = grid.querySelector('.thumb[data-id="'+id+'"]');
+  if(cell) cell.classList.add('active-preview');
+
+  const photo = state.photos.get(id);
+  const idx = state.sequence.indexOf(id);
+
+  el('preview-placeholder').style.display='none';
+  el('preview-fname').textContent = photo.name;
+  el('preview-meta').style.display='';
+  el('preview-frame-badge').style.display='';
+  el('preview-frame-badge').textContent = 'Bild ' + (idx+1) + ' / ' + state.sequence.length;
+  el('preview-prev').style.display = idx>0 ? 'flex':'none';
+  el('preview-next').style.display = idx<state.sequence.length-1 ? 'flex':'none';
+  el('preview-pos-input').value = idx+1;
+  el('preview-pos-input').max = state.sequence.length;
+
+  const chips = el('preview-chips');
+  chips.innerHTML='';
+  const dateChip = document.createElement('span');
+  dateChip.className='chip date';
+  const dLabel = photo.exifDate ? fmtDate(photo.exifDate) : fmtDate(new Date(photo.lastModified));
+  dateChip.textContent = (photo.dateSource==='exif' ? '📷 ' : '🗂 ') + (dLabel||'unbekannt');
+  chips.appendChild(dateChip);
+  if(photo.dateSource!=='exif'){
+    const warn=document.createElement('span');
+    warn.className='chip warn';
+    warn.textContent='kein EXIF-Datum';
+    chips.appendChild(warn);
+  }
+  if(photo.camera){
+    const c=document.createElement('span'); c.className='chip'; c.textContent=photo.camera;
+    chips.appendChild(c);
+  }
+  const sizeChip=document.createElement('span');
+  sizeChip.className='chip';
+  sizeChip.textContent=(photo.size/1024/1024).toFixed(1)+' MB';
+  chips.appendChild(sizeChip);
+
+  const imgEl = el('preview-img');
+  imgEl.style.display='none';
+  try{
+    const bitmap = await createImageBitmap(photo.file, {imageOrientation:'from-image'});
+    const maxDim = 1700;
+    const scale = Math.min(1, maxDim/Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width*scale);
+    canvas.height = Math.round(bitmap.height*scale);
+    canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+    bitmap.close && bitmap.close();
+    const blob = await new Promise(res=>canvas.toBlob(res,'image/jpeg',0.9));
+    const url = URL.createObjectURL(blob);
+    if(state.currentPreviewId===id){
+      imgEl.src = url;
+      imgEl.style.display='block';
+      imgEl.onload = ()=>URL.revokeObjectURL(url);
+    }
+  }catch(e){
+    // fallback: raw file
+    const url = URL.createObjectURL(photo.file);
+    imgEl.src=url; imgEl.style.display='block';
+  }
+}
+
+function previewStep(dir){
+  if(!state.currentPreviewId) return;
+  const idx = state.sequence.indexOf(state.currentPreviewId);
+  const newIdx = idx+dir;
+  if(newIdx<0 || newIdx>=state.sequence.length) return;
+  setPreview(state.sequence[newIdx]);
+  scrollCellIntoView(state.sequence[newIdx]);
+}
+function scrollCellIntoView(id){
+  const cell = grid.querySelector('.thumb[data-id="'+id+'"]');
+  if(cell) cell.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+
+function applyManualPosition(){
+  const id = state.currentPreviewId;
+  if(!id) return;
+  let newPos = parseInt(el('preview-pos-input').value,10);
+  if(isNaN(newPos)) return;
+  newPos = Math.max(1, Math.min(state.sequence.length, newPos));
+  const curIdx = state.sequence.indexOf(id);
+  state.sequence.splice(curIdx,1);
+  state.sequence.splice(newPos-1,0,id);
+  pushHistory();
+  renderGrid();
+  setPreview(id);
+  toast('Position gesetzt.');
+}
+
+function openMobilePreview(){
+  el('preview-panel').classList.add('mobile-open');
+}
+function closeMobilePreview(){
+  el('preview-panel').classList.remove('mobile-open');
+}
+
+/* ============================= MODE SWITCH ============================= */
+function setMode(mode){
+  state.mode = mode;
+  el('mode-drag').classList.toggle('active', mode==='drag');
+  el('mode-click').classList.toggle('active', mode==='click');
+  el('btn-reset-numbering').style.display = mode==='click' ? '' : 'none';
+  el('grid-hint').textContent = mode==='drag'
+    ? 'Bilder ziehen, um die Reihenfolge zu ändern. Klick öffnet die Großvorschau.'
+    : 'Klickt die Fotos in der gewünschten Reihenfolge an — Nummern werden automatisch vergeben. Nochmal klicken entfernt die Nummer.';
+  if(mode==='click'){ state.clickCounter = 0; }
+  renderGrid();
+}
+
+/* ============================= EXPORT ============================= */
+async function doExport(){
+  const style = parseInt(el('export-prefix-style').value,10);
+  const onlyFromCurrent = el('export-scope-checkbox').checked;
+  let ids = state.sequence.slice();
+  let offset = 0;
+  if(onlyFromCurrent && state.currentPreviewId){
+    const idx = ids.indexOf(state.currentPreviewId);
+    offset = idx;
+    ids = ids.slice(idx);
+  }
+  closeExportModal();
+  toast('Erzeuge ZIP-Archiv…', true);
+
+  const zip = new JSZip();
+  const total = ids.length;
+  for(let i=0;i<total;i++){
+    const photo = state.photos.get(ids[i]);
+    const num = pad(offset+i+1, style);
+    const outName = num+'_'+photo.name;
+    const buf = await photo.file.arrayBuffer();
+    zip.file(outName, buf);
+    if(i % 10 === 0) toastProgress(i/total*90);
+  }
+  toastProgress(92);
+  const blob = await zip.generateAsync({type:'blob', compression:'STORE'}, (meta)=>{
+    toastProgress(92 + meta.percent*0.08);
+  });
+  toastProgress(100);
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const stamp = new Date().toISOString().slice(0,10);
+  a.download = 'urlaubsfotos_sortiert_'+stamp+'.zip';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(toastHide, 400);
+  toast('Export fertig — '+total+' Bild(er) als ZIP heruntergeladen.');
+}
+
+function openExportModal(){
+  el('export-modal').classList.add('show');
+  el('export-prefix-style').value = state.sequence.length>999 ? '4':'3';
+  el('export-scope-checkbox').checked=false;
+}
+function closeExportModal(){
+  el('export-modal').classList.remove('show');
+}
+
+/* ============================= EVENT WIRING ============================= */
+el('btn-pick-files').addEventListener('click', ()=>el('file-input').click());
+el('btn-pick-folder').addEventListener('click', ()=>el('folder-input').click());
+el('btn-add-more').addEventListener('click', ()=>el('file-input').click());
+el('file-input').addEventListener('change', (e)=>{ handleFilesImport(e.target.files); e.target.value=''; });
+el('folder-input').addEventListener('change', (e)=>{ handleFilesImport(e.target.files); e.target.value=''; });
+
+el('btn-autosort').addEventListener('click', autoSortByDate);
+el('btn-undo').addEventListener('click', undo);
+el('btn-redo').addEventListener('click', redo);
+el('btn-export').addEventListener('click', openExportModal);
+el('export-cancel').addEventListener('click', closeExportModal);
+el('export-confirm').addEventListener('click', doExport);
+
+function setThumbSize(px){
+  px = Math.max(90, Math.min(260, px));
+  grid.style.setProperty('--thumb-size', px+'px');
+  el('zoom-slider').value = px;
+}
+el('zoom-slider').addEventListener('input', (e)=>setThumbSize(parseInt(e.target.value,10)));
+el('zoom-in').addEventListener('click', ()=>setThumbSize(parseInt(el('zoom-slider').value,10)+24));
+el('zoom-out').addEventListener('click', ()=>setThumbSize(parseInt(el('zoom-slider').value,10)-24));
+
+// Two-finger pinch on the grid also zooms, for a native mobile feel.
+(function enablePinchZoom(){
+  let pinchStartDist=null, pinchStartSize=null;
+  const active = new Map();
+  gridScroll.addEventListener('pointerdown', (e)=>{
+    if(e.pointerType!=='touch') return;
+    active.set(e.pointerId, {x:e.clientX,y:e.clientY});
+  });
+  gridScroll.addEventListener('pointermove', (e)=>{
+    if(e.pointerType!=='touch' || !active.has(e.pointerId)) return;
+    active.set(e.pointerId, {x:e.clientX,y:e.clientY});
+    if(active.size===2){
+      const pts = Array.from(active.values());
+      const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+      if(pinchStartDist===null){
+        pinchStartDist = dist;
+        pinchStartSize = parseInt(el('zoom-slider').value,10);
+      }else{
+        e.preventDefault();
+        const ratio = dist/pinchStartDist;
+        setThumbSize(Math.round(pinchStartSize*ratio));
+      }
+    }
+  }, {passive:false});
+  function clear(e){
+    active.delete(e.pointerId);
+    if(active.size<2){ pinchStartDist=null; pinchStartSize=null; }
+  }
+  gridScroll.addEventListener('pointerup', clear);
+  gridScroll.addEventListener('pointercancel', clear);
+})();
+
+el('mode-drag').addEventListener('click', ()=>setMode('drag'));
+el('mode-click').addEventListener('click', ()=>setMode('click'));
+el('btn-reset-numbering').addEventListener('click', resetNumbering);
+
+el('preview-prev').addEventListener('click', ()=>previewStep(-1));
+el('preview-next').addEventListener('click', ()=>previewStep(1));
+el('preview-pos-apply').addEventListener('click', applyManualPosition);
+el('preview-close-mobile').addEventListener('click', closeMobilePreview);
+
+document.addEventListener('keydown', (e)=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.key==='ArrowLeft') previewStep(-1);
+  if(e.key==='ArrowRight') previewStep(1);
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  if((e.ctrlKey||e.metaKey) && (e.key.toLowerCase()==='y' || (e.key.toLowerCase()==='z' && e.shiftKey))) { e.preventDefault(); redo(); }
+});
+
+/* Drag & drop from OS */
+let dragDepth=0;
+window.addEventListener('dragenter', (e)=>{
+  e.preventDefault();
+  dragDepth++;
+  el('dropzone-overlay').classList.add('active');
+});
+window.addEventListener('dragover', (e)=>e.preventDefault());
+window.addEventListener('dragleave', (e)=>{
+  dragDepth--;
+  if(dragDepth<=0){ el('dropzone-overlay').classList.remove('active'); dragDepth=0; }
+});
+window.addEventListener('drop', async (e)=>{
+  e.preventDefault();
+  dragDepth=0;
+  el('dropzone-overlay').classList.remove('active');
+  const items = e.dataTransfer.items;
+  if(items && items.length && items[0].webkitGetAsEntry){
+    const files = await readDroppedEntries(items);
+    if(files.length) handleFilesImport(files);
+  }else{
+    handleFilesImport(e.dataTransfer.files);
+  }
+});
+
+async function readDroppedEntries(items){
+  const entries = Array.from(items).map(it=>it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
+  const files = [];
+  async function walk(entry){
+    if(entry.isFile){
+      await new Promise(res=>entry.file(f=>{files.push(f);res();}));
+    }else if(entry.isDirectory){
+      const reader = entry.createReader();
+      const readBatch = ()=>new Promise(res=>reader.readEntries(res));
+      let batch;
+      do{
+        batch = await readBatch();
+        for(const e2 of batch) await walk(e2);
+      }while(batch.length>0);
+    }
+  }
+  for(const entry of entries) await walk(entry);
+  return files;
+}
+
+})();
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>
